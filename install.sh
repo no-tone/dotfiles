@@ -7,14 +7,20 @@ CONFIG_DIR="$HOME/.config"
 link_dir() {
   local source="$1"
   local target="$2"
+  local current_link=""
 
   mkdir -p "$CONFIG_DIR"
 
   if [ -L "$target" ]; then
+    current_link="$(readlink "$target")"
+    if [ "$current_link" = "$source" ]; then
+      echo "Already linked: $target -> $source"
+      return
+    fi
     echo "Replacing existing symlink: $target"
     rm "$target"
   elif [ -e "$target" ]; then
-    local backup_path="${target}.bak.$(date +%Y%m%d%H%M%S)"
+    local backup_path="${target}.bak.$(date +%Y%m%d%H%M%S).$$"
     echo "Backing up existing path: $target -> $backup_path"
     mv "$target" "$backup_path"
   fi
