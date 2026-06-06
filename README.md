@@ -4,7 +4,7 @@ A home for personal configuration files.
 
 ## Included setup
 
-- `nvim_backup/lua/custom/cmdline.lua` (from the provided gist)
+- `nvim/lua/custom/cmdline.lua` (from the provided gist content)
 - `opencode/`
 - `ghostty/`
 
@@ -18,7 +18,7 @@ Run from the repository root:
 
 The installer symlinks these folders into `~/.config`:
 
-- `~/.config/nvim_backup`
+- `~/.config/nvim`
 - `~/.config/opencode`
 - `~/.config/ghostty`
 

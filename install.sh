@@ -20,7 +20,7 @@ link_dir() {
   echo "Linked $target -> $source"
 }
 
-link_dir "$ROOT_DIR/nvim_backup" "$CONFIG_DIR/nvim_backup"
+link_dir "$ROOT_DIR/nvim" "$CONFIG_DIR/nvim"
 link_dir "$ROOT_DIR/opencode" "$CONFIG_DIR/opencode"
 link_dir "$ROOT_DIR/ghostty" "$CONFIG_DIR/ghostty"
 
