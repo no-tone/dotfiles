@@ -7,11 +7,16 @@ CONFIG_DIR="$HOME/.config"
 link_dir() {
   local source="$1"
   local target="$2"
-  local current_link=""
 
   mkdir -p "$CONFIG_DIR"
 
+  if [ ! -e "$source" ]; then
+    echo "Skipping missing source: $source"
+    return
+  fi
+
   if [ -L "$target" ]; then
+    local current_link
     current_link="$(readlink "$target")"
     if [ "$current_link" = "$source" ]; then
       echo "Already linked: $target -> $source"
