@@ -11,9 +11,10 @@ link_dir() {
   mkdir -p "$CONFIG_DIR"
 
   if [ -L "$target" ]; then
+    echo "Replacing existing symlink: $target"
     rm "$target"
   elif [ -e "$target" ]; then
-    mv "$target" "${target}.bak.$(date +%Y%m%d%H%M%S)"
+    mv -T "$target" "${target}.bak.$(date +%Y%m%d%H%M%S)"
   fi
 
   ln -s "$source" "$target"
