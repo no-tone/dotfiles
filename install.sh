@@ -20,7 +20,17 @@ link_dir() {
     echo "Replacing existing symlink: $target"
     rm "$target"
   elif [ -e "$target" ]; then
-    local backup_path="${target}.bak.$(date +%Y%m%d%H%M%S).$$"
+    local timestamp
+    local backup_path
+    local suffix=0
+
+    timestamp="$(date +%Y%m%d%H%M%S)"
+    backup_path="${target}.bak.${timestamp}"
+    while [ -e "$backup_path" ] || [ -L "$backup_path" ]; do
+      suffix=$((suffix + 1))
+      backup_path="${target}.bak.${timestamp}.${suffix}"
+    done
+
     echo "Backing up existing path: $target -> $backup_path"
     mv "$target" "$backup_path"
   fi

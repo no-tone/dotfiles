@@ -22,4 +22,4 @@ The installer symlinks these folders into `~/.config`:
 - `~/.config/opencode`
 - `~/.config/ghostty`
 
-If a target already exists, it is backed up as `*.bak.<timestamp>.<pid>`.
+If a target already exists, it is backed up as `*.bak.<timestamp>` (or `*.bak.<timestamp>.<n>` if needed to avoid collisions).
