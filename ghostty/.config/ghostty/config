@@ -1,0 +1,66 @@
+theme = "tokyonight"
+
+font-family = "JetBrainsMono Nerd Font"
+font-size = 14
+
+font-feature = ["calt", "liga", "dlig", "ss01", "ss02", "ss03", "ss04", "ss05", "ss06", "ss07", "ss08"]
+
+cursor-style = "bar"
+cursor-style-blink = true
+
+mouse-hide-while-typing = true
+copy-on-select = "clipboard"
+
+confirm-close-surface = false
+
+clipboard-read = "allow"
+clipboard-write = "allow"
+
+background-opacity = 0.95
+background-blur-radius = 8
+
+macos-option-as-alt = true
+
+# PT-PT: override Option+2 to produce @ (instead of escape sequence)
+keybind = opt+2=text:@
+
+macos-titlebar-style = "tabs"
+
+shell-integration = "zsh"
+
+quick-terminal-position = "bottom"
+quick-terminal-screen = "main"
+
+# --- tmux-style multiplexing (Ghostty-native, no tmux) ---
+#
+# ctrl+a is the leader key, like tmux. Ghostty waits indefinitely for the next
+# key after a leader, so a bare ctrl+a never reaches the shell. The double-tap
+# below is tmux's send-prefix: it emits a real ^A (zsh binds ^A to
+# beginning-of-line, fzf uses it in its prompt — both still reachable).
+keybind = ctrl+a>ctrl+a=text:\x01
+
+# Navigate splits — no leader, borrowed from the article scheme
+keybind = ctrl+h=goto_split:left
+keybind = ctrl+j=goto_split:bottom
+keybind = ctrl+k=goto_split:top
+keybind = ctrl+l=goto_split:right
+
+# Create splits — leader + vim direction
+keybind = ctrl+a>h=new_split:left
+keybind = ctrl+a>j=new_split:down
+keybind = ctrl+a>k=new_split:up
+keybind = ctrl+a>l=new_split:right
+
+keybind = ctrl+a>f=toggle_split_zoom
+# close focused split (tmux kill-pane); last split in tab closes the tab
+keybind = ctrl+a>x=close_surface
+
+# Tabs
+keybind = ctrl+n=new_window
+keybind = ctrl+a>n=next_tab
+keybind = ctrl+a>p=previous_tab
+
+# Replaces tmux session persistence (macOS: restores windows on relaunch)
+window-save-state = always
+
+keybind = super+r=reload_config

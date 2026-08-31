@@ -1,0 +1,368 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dotfiles manifest.jsonc",
+  "description": "Single source of truth for stow packages, tools, and package-manager generation. See CLAUDE.md.",
+  "type": "object",
+  "required": [
+    "app",
+    "version",
+    "stow_packages",
+    "tools"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "app": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "stow_packages": {
+      "type": "array",
+      "description": "Stow package directories. Order matters: \"stow\" must be first.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "platforms"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "platforms": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "enum": [
+                "macos",
+                "linux",
+                "windows"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "stow_ignore": {
+      "type": "array",
+      "description": "Unanchored basename regex fragments; anchored with ^...$ at use time.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "cmd"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "cmd": {
+            "type": "string",
+            "description": "Binary name, used for `command -v` detection"
+          },
+          "brew": {
+            "type": "string",
+            "description": "Homebrew formula name (macOS/Linux)"
+          },
+          "winget": {
+            "type": "string",
+            "description": "winget package ID (Windows)"
+          },
+          "app": {
+            "type": "string",
+            "description": "macOS application bundle name, checked when cmd is not on PATH."
+          }
+        }
+      }
+    },
+    "zsh_plugins": {
+      "type": "array",
+      "description": "zsh plugins installed alongside tools (brew only).",
+      "items": {
+        "type": "object",
+        "required": [
+          "brew"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "brew": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "brew_casks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "brew",
+          "platforms"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "brew": {
+            "type": "string"
+          },
+          "platforms": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "enum": [
+                "macos",
+                "linux",
+                "windows"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "extras": {
+      "type": "array",
+      "description": "Tools with no package-manager entry, installed by dedicated functions in the installers.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "platforms"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "platforms": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "enum": [
+                "macos",
+                "linux",
+                "windows"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "winget_extras": {
+      "type": "array",
+      "description": "GUI apps with winget IDs, not already in tools[].",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mcps": {
+      "type": "array",
+      "description": "npm packages installed globally (OpenCode MCP servers + token-reduction plugins).",
+      "items": {
+        "type": "string"
+      }
+    },
+    "system_components": {
+      "type": "array",
+      "description": "Platform-specific symlinks handled outside the stow engine.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "platforms"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "platforms": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "enum": [
+                "macos",
+                "linux",
+                "windows"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "vault": {
+      "description": "Which Bitwarden deployment the secrets live on. Omit for Bitwarden's default (the US cloud). Not a secret.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server": {
+          "type": "string",
+          "format": "uri",
+          "description": "Deployment URL, e.g. https://vault.bitwarden.eu for the EU cloud. doti runs `bw config server` with this before unlocking."
+        }
+      }
+    },
+    "secrets": {
+      "description": "Files rendered from Bitwarden at install time by `doti secrets`. Never committed, and deliberately not stow packages: stow symlinks $HOME into the repo, so a stowed secret sits in the working tree.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "mode",
+          "target"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Identifier shown in doti's output."
+          },
+          "mode": {
+            "enum": [
+              "file",
+              "template"
+            ],
+            "description": "'file' writes one vault field verbatim (for a wholly-sensitive file). 'template' renders a checked-in .tmpl, filling named holes."
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^(~/|/)",
+            "description": "Absolute or ~/-prefixed path in $HOME. A relative path is refused: it would resolve against the working directory, which for an installer run from the repo means writing the secret into the repo."
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "macos",
+                "linux",
+                "windows"
+              ]
+            },
+            "description": "Omit for every platform."
+          },
+          "item": {
+            "type": "string",
+            "description": "mode=file: the Bitwarden item name or id."
+          },
+          "field": {
+            "type": "string",
+            "description": "mode=file: which field to read - 'notes', 'username', 'password', or a custom field name. Defaults to 'notes'."
+          },
+          "template": {
+            "type": "string",
+            "description": "mode=template: path to the template, relative to the repo root."
+          },
+          "values": {
+            "type": "object",
+            "description": "mode=template: template key -> where to read it from.",
+            "additionalProperties": {
+              "type": "object",
+              "required": [
+                "item"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "item": {
+                  "type": "string"
+                },
+                "field": {
+                  "type": "string",
+                  "description": "Defaults to 'password'."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "extra_tools": {
+          "type": "object",
+          "description": "Additional tools to verify beyond the tools[] cmd list, per OS.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "A command that must be on PATH."
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "cmd"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "cmd": {
+                      "type": "string"
+                    },
+                    "app": {
+                      "type": "string",
+                      "description": "macOS application bundle name, checked when cmd is not on PATH."
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "links": {
+          "type": "object",
+          "description": "Config symlinks to verify. Keys are $HOME-relative target paths, values are repo-relative source paths.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "cli": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "flag": {
+                "type": "string"
+              },
+              "desc": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "fresh_machine": {
+          "type": "string"
+        },
+        "existing_machine": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

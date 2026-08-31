@@ -1,0 +1,21 @@
+.DS_Store
+*.bak.*
+brew/Brewfile.lock.json
+brew/Brewfile
+win/winget/packages.json
+.opencode/
+# opencode stow package — runtime deps not tracked
+opencode/.config/opencode/node_modules/
+# oh-my-opencode-slim's own runtime state (per-machine hashes/timestamps of
+# installed/deleted skills) — generated, not authored; same treatment as
+# brew/Brewfile and win/winget/packages.json above.
+opencode/.config/opencode/.oh-my-opencode-slim/skills-manifest.json
+# Rendered secrets. `doti secrets` writes these straight into $HOME and never
+# into the repo, so nothing here should ever match - this is the backstop for
+# the day someone renders one by hand in the wrong directory.
+mssql-envs.json
+.gitconfig.local
+# Rendered secrets live in ~/.doti/, outside every stow package - so nothing
+# here should ever match. Listed anyway as the backstop for the day someone
+# renders one by hand in the wrong directory.
+.doti/

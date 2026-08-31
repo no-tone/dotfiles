@@ -1,0 +1,41 @@
+# ~/.stow-global-ignore — honored by EVERY `stow` run (installer OR manual),
+# for every package. Symlinked here by the `stow` package.
+#
+# IMPORTANT: a global (or package-local) ignore list *replaces* Stow's built-in
+# defaults — it does not merge with them. So the defaults we still want are
+# re-listed below, followed by our own additions. Perl regexes, one per line;
+# a leading '/' anchors to the package root (see the Stow manual, "Types And
+# Syntax Of Ignore Lists").
+
+# --- Stow's built-in defaults (kept, since a custom list overrides them) ---
+RCS
+.+,v
+
+CVS
+\.\#.+
+\.cvsignore
+
+\.svn
+_darcs
+\.hg
+
+\.git
+\.gitignore
+\.gitmodules
+
+.+~
+\#.*\#
+
+^/README.*
+^/LICENSE.*
+^/COPYING
+
+# --- Our additions: runtime junk that lives inside packages ---
+\.DS_Store
+node_modules
+package(-lock)?\.json
+bun\.lock
+
+\.bak
+\.stow-local-ignore
+skills-manifest\.json

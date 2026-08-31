@@ -1,0 +1,43 @@
+# Global gitignore — applies to EVERY repo (core.excludesFile).
+# Keep OS cruft, editor droppings, and machine-local secrets out of every
+# project without touching each project's own .gitignore.
+
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# --- Windows ---
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# --- Linux ---
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# --- Editors / IDEs ---
+*.swp
+*.swo
+*.swn
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.sublime-workspace
+
+# --- Env / secrets (belt-and-suspenders; never commit these) ---
+.env
+.env.local
+*.pem
+
+# --- Build / dependency junk that slips past project ignores ---
+node_modules/
+.direnv/
+
+**/.claude/settings.local.json

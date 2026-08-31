@@ -1,0 +1,147 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // ── Preset ──────────────────────────────────────────────────────
+  // All agents share one model; variant controls temperature/creativity.
+
+  // Explicit empty arrays to prevent undefined/string merge bugs
+  // in oh-my-opencode-slim@2.2.8 health check (line 40138-40151).
+  "disabled_tools": [],
+  "disabled_mcps": [],
+  "disabled_skills": [],
+
+  "preset": "default",
+  "presets": {
+    "default": {
+
+      // ── Orchestrator ──────────────────────────────────────────
+      // Routes tasks to specialists. Needs strongest reasoning.
+      "orchestrator": {
+        "model": "opencode/big-pickle",
+        "variant": "high",
+        "skills": ["*"],
+        "mcps": ["*"]
+      },
+
+      // ── Oracle ────────────────────────────────────────────────
+      // Architecture, debugging, strategic advice. Read-only.
+      "oracle": {
+        "model": "opencode/deepseek-v4-flash-free",
+        "variant": "high",
+        "skills": ["*"],
+        "mcps": []
+      },
+
+      // ── Fixer ─────────────────────────────────────────────────
+      // Fast implementation. Doesn't need highest reasoning —
+      // gets context from orchestrator/oracle.
+      "fixer": {
+        "model": "opencode/deepseek-v4-flash-free",
+        "variant": "low",
+        "skills": [],
+        "mcps": []
+      },
+
+      // ── Explorer ──────────────────────────────────────────────
+      // Fast codebase search (grep/glob). Free model (deepseek) — cheap.
+      "explorer": {
+        "model": "opencode/deepseek-v4-flash-free",
+        "variant": "low",
+        "skills": [],
+        "mcps": []
+      },
+
+      // ── Librarian ─────────────────────────────────────────────
+      // External docs lookup. Free model; MCPs must be real servers
+      // (context7 + fetch).
+      "librarian": {
+        "model": "opencode/mimo-v2.5-free",
+        "variant": "low",
+        "skills": [],
+        "mcps": ["context7", "fetch"]
+      },
+
+      // ── Designer ──────────────────────────────────────────────
+      // UI/UX — creative work benefits from higher temperature.
+      "designer": {
+        "model": "opencode/deepseek-v4-flash-free",
+        "variant": "high",
+        "skills": ["*"],
+        "mcps": ["*"]
+      },
+
+      // ── Council (SYNTHESIZER) ─────────────────────────────────
+      // This is the model that reconciles the councillors' independent
+      // answers into one final response. The councillor MEMBERS are
+      // defined in the top-level "council" block below. Keep this strong.
+      "council": {
+        "model": "opencode/mimo-v2.5-free",
+        "variant": "high",
+        "skills": ["*"],
+        "mcps": []
+      }
+    }
+  },
+
+  // ── Council members (ensemble) ───────────────────────────────────
+  // Two-layer feature (schema per omo-slim docs/council.md):
+  //   1. SYNTHESIZER = presets.<preset>.council.model (above).
+  //   2. COUNCILLORS = this block. Each answers the query independently;
+  //      each is registered as a subagent `councillor-<name>`.
+  // Invoke with `@council <query>` (uses default_preset). Members are the
+  // three models confirmed to have a working provider on this account:
+  // deepseek + mimo (free) and big-pickle. The synthesizer also uses
+  // big-pickle. (The other free Zen models returned "No provider available".)
+  // Test wiring with `@council test Council connectivity`.
+  // NOTE: council.master / master-* keys are DEPRECATED — do not use them.
+  "council": {
+    "default_preset": "default",
+    "presets": {
+      "default": {
+        "reviewer": {
+          "model": "opencode/deepseek-v4-flash-free",
+          "prompt": "Focus on correctness: bugs, edge cases, race conditions, and failure modes. Be concrete about how the proposed approach could break."
+        },
+        "architect": {
+          "model": "opencode/mimo-v2.5-free",
+          "prompt": "Focus on maintainability: module boundaries, coupling, naming, and long-term design. Flag decisions that are hard to reverse later."
+        },
+        "optimizer": {
+          "model": "opencode/deepseek-v4-flash-free",
+          "prompt": "Focus on pragmatism: the simplest thing that works, performance, and avoiding over-engineering. Push back on unnecessary complexity."
+        }
+      }
+    }
+  },
+
+  // ── Custom Agents ────────────────────────────────────────────────
+  // These supplement the agents in ~/.config/opencode/agents/.
+  // The orchestrator uses orchestratorPrompt to know when to route here.
+  "agents": {
+    "git-expert": {
+      "model": "opencode/deepseek-v4-flash-free",
+      "prompt": "Git specialist for rebasing, conflict resolution, bisect, worktrees, history rewriting. Explain commands before running. Use dry-runs and backup branches for destructive ops.",
+      "orchestratorPrompt": "Delegate to @git-expert for rebasing, conflict resolution, bisect, worktrees, history rewriting, reflog recovery, or any complex git workflow. Not needed for simple status/diff/log."
+    },
+    "test-engineer": {
+      "model": "opencode/deepseek-v4-flash-free",
+      "prompt": "Test strategist and implementer. Design tests, debug failures, analyze coverage. Test behavior not implementation. Arrange-act-assert. Framework-agnostic (vitest, jest, pytest, go test, bats).",
+      "orchestratorPrompt": "Delegate to @test-engineer for creating tests, debugging failures, coverage analysis, flaky fixes, or test architecture. Not needed for running tests that already pass."
+    },
+    "shell-expert": {
+      "model": "opencode/deepseek-v4-flash-free",
+      "prompt": "Shell scripting specialist. Portable bash/zsh with set -euo pipefail. POSIX-preferred, quote variables, handle errors, add usage text for scripts with arguments.",
+      "orchestratorPrompt": "Delegate to @shell-expert for writing scripts, CLI config, cron jobs, aliases, PATH setup, or shell-specific debugging. Not needed for simple one-off commands."
+    },
+    "mssql-engineer": {
+      "model": "opencode/deepseek-v4-flash-free",
+      "prompt": "MSSQL engineer. Expert in T-SQL, stored procedures, schema design, connection config. Never commit credentials — use env vars or secret managers.",
+      "orchestratorPrompt": "Delegate to @mssql-engineer for T-SQL queries, stored procedures, schema design, migration scripts, connection config, or performance tuning."
+    },
+    "organizer": {
+      "model": "opencode/deepseek-v4-flash-free",
+      "prompt": "Dotfiles repo structure maintainer. Check config consistency across packages, spot gaps/stale files, validate cross-platform parity. Return list of structural issues.",
+      "orchestratorPrompt": "Delegate to @organizer for dotfiles structure questions, cross-config consistency checks, identifying stale/missing configs, or understanding package relationships."
+    }
+  }
+}

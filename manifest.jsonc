@@ -1,0 +1,259 @@
+{
+  "$schema": "./manifest.schema.json",
+  // ═══════════════════════════════════════════════════════════════
+  //  manifest.jsonc — single source of truth for dotfiles
+  // ═══════════════════════════════════════════════════════════════
+  //  `doti` reads this file (apps/doti in riptone/tone.rip).
+  //  Brewfile and packages.json are GENERATED from it at install
+  //  time, into a temp directory, so neither is ever committed:
+  //    doti packages
+  //
+  //  To add a new tool: add an entry to "tools" → done.
+  //  To add a new config: add to "stow_packages" → done.
+  // ═══════════════════════════════════════════════════════════════
+
+  "app": "dotfiles",
+  "version": "9.0.0",
+
+  // ── Stow packages ────────────────────────────────────────────
+  // Order matters: "stow" is always first so ~/.stow-global-ignore
+  // is linked before the others are processed.
+  // "platforms" is the single source of truth for which OSes get each
+  // package — doti filters from this instead of hardcoding a
+  // Unix-only/Windows-only exclusion list.
+  "stow_packages": [
+    { "name": "stow",     "platforms": ["macos", "linux", "windows"] },
+    { "name": "zsh",      "platforms": ["macos", "linux"] },
+    { "name": "ghostty",  "platforms": ["macos", "linux"] },
+    { "name": "git",      "platforms": ["macos", "linux", "windows"] },
+    { "name": "opencode", "platforms": ["macos", "linux", "windows"] },
+    { "name": "ripgrep",  "platforms": ["macos", "linux", "windows"] },
+    { "name": "starship", "platforms": ["macos", "linux", "windows"] }
+  ],
+
+  // ── Stow ignore patterns ─────────────────────────────────────
+  // Basename regexes (anchored ^…$). Additive to stow's built-in
+  // defaults when passed via --ignore on the CLI. Also mirrored in
+  // .stow-global-ignore (which replaces defaults entirely, so it
+  // re-lists the built-ins we want to keep).
+  "stow_ignore": [
+    "\\.DS_Store",
+    "node_modules",
+    "package(-lock)?\\.json",
+    "bun\\.lock",
+    "\\.gitignore",
+    "\\.stow-local-ignore",
+    "\\.bak",
+    "skills-manifest\\.json"
+  ],
+
+  // ── Tools ────────────────────────────────────────────────────
+  // CLI tools installed via package managers.
+  //   cmd     = binary name (used for detection: `command -v $cmd`)
+  //   brew    = Homebrew formula name
+  //   winget  = winget package ID
+  //   zsh_plugins = zsh plugins installed alongside (brew only)
+  "tools": [
+    { "cmd": "jq",       "brew": "jq",       "winget": "jqlang.jq" },
+    { "cmd": "git",      "brew": "git",      "winget": "Git.Git" },
+    { "cmd": "curl",     "brew": "curl",     "winget": "cURL.cURL" },
+    { "cmd": "node",     "brew": "node",     "winget": "OpenJS.NodeJS" },
+    { "cmd": "stow",     "brew": "stow" },
+    { "cmd": "rg",       "brew": "ripgrep",  "winget": "BurntSushi.ripgrep.MSVC" },
+    { "cmd": "fd",       "brew": "fd",       "winget": "sharkdp.fd" },
+    { "cmd": "gh",       "brew": "gh",       "winget": "GitHub.cli" },
+    { "cmd": "fzf",      "brew": "fzf",      "winget": "junegunn.fzf" },
+    { "cmd": "zoxide",   "brew": "zoxide",   "winget": "ajeetdsouza.zoxide" },
+    { "cmd": "eza",      "brew": "eza",      "winget": "eza-community.eza" },
+    { "cmd": "bat",      "brew": "bat",      "winget": "sharkdp.bat" },
+
+    { "cmd": "starship", "brew": "starship", "winget": "Starship.Starship" },
+    { "cmd": "code",     "winget": "Microsoft.VisualStudioCode" },
+    { "cmd": "rtk",      "brew": "rtk",      "winget": "rtk-ai.rtk" },
+    // Needed before `doti secrets` can render anything - see "secrets" below.
+    { "cmd": "bw",       "brew": "bitwarden-cli", "winget": "Bitwarden.CLI" }
+  ],
+
+  // zsh interactive plugins (no framework — sourced from ~/.zshrc)
+  "zsh_plugins": [
+    { "brew": "zsh-autosuggestions" },
+    { "brew": "zsh-fast-syntax-highlighting" }
+  ],
+
+  // ── Brew casks (macOS only) ──────────────────────────────────
+  "brew_casks": [
+    { "brew": "ghostty",                   "platforms": ["macos"] },
+    { "brew": "visual-studio-code",        "platforms": ["macos"] },
+    { "brew": "brave-browser",             "platforms": ["macos"] },
+    { "brew": "font-jetbrains-mono-nerd-font", "platforms": ["macos"] },
+    { "brew": "hiddenbar",                 "platforms": ["macos"] }
+  ],
+
+  // ── Extra tools (installed via custom functions) ─────────────
+  // These aren't in any package manager — each has a dedicated
+  // install function in the installers.
+  "extras": [
+    {
+      "name": "nerd-font",
+      "description": "JetBrainsMono Nerd Font",
+      "platforms": ["linux", "windows"]
+    }
+  ],
+
+  // ── Winget extras (GUI apps not in tools[]) ──────────────
+  "winget_extras": [
+    "Microsoft.PowerShell",
+    "Microsoft.WindowsTerminal",
+    "Microsoft.VisualStudioCode",
+    "Brave.Brave"
+  ],
+
+  // ── NPM global packages ─────────────────────────────────
+  // OpenCode MCP servers + token-reduction plugins, installed globally
+  // to avoid npx overhead. Each entry: `npm install -g <name>`.
+  "mcps": [
+    "mcp-sqlite-tools",
+    "mcp-fetch-server",
+    "@upstash/context7-mcp",
+    "@connorbritain/mssql-mcp-server",
+    "opencode-snip",
+    "snip",
+    "openslimedit"
+  ],
+
+  // ── System components (non-stow) ─────────────────────────────
+  // Platform-specific symlinks handled outside the stow engine.
+  "system_components": [
+    {
+      "name": "gitconfig-local",
+      "description": "Machine-local git config (~/.gitconfig.local)",
+      "platforms": ["linux", "macos", "windows"]
+    },
+    {
+      "name": "windows-terminal",
+      "description": "Windows Terminal settings.json",
+      "platforms": ["windows"]
+    },
+    {
+      "name": "powershell-profile",
+      "description": "PowerShell 7 profile ($PROFILE)",
+      "platforms": ["windows"]
+    }
+  ],
+
+  // ── Health check ─────────────────────────────────────────────
+  "health": {
+    // Additional tools to verify beyond the tools[] cmd list.
+    // A bare string is a command on PATH. The object form is for a GUI app,
+    // which installs to /Applications and puts nothing on PATH - so
+    // `command -v ghostty` is a permanent false negative and would keep
+    // `doti check --strict` red on a machine where Ghostty is open.
+    "extra_tools": {
+      "linux":   ["zsh", "brew", "stow"],
+      "macos":   ["zsh", { "cmd": "ghostty", "app": "Ghostty" }, "brew", "stow"],
+      "windows": ["code", "winget"]
+    },
+    // Config symlinks to verify.
+    // Keys are target paths in $HOME; values are relative source paths
+    // in the repo. Tildes and special tokens are expanded at runtime.
+    "links": {
+      "linux": {
+        "~/.stow-global-ignore":   "stow/.stow-global-ignore",
+        "~/.zshrc":                "zsh/.zshrc",
+        "~/.zprofile":             "zsh/.zprofile",
+        "~/.zsh/aliases.zsh":      "zsh/.zsh/aliases.zsh",
+        "~/.gitconfig":            "git/.gitconfig",
+        "~/.config/ripgrep":       "ripgrep/.config/ripgrep",
+        "~/.config/git/ignore":    "git/.config/git/ignore",
+        "~/.config/ghostty":       "ghostty/.config/ghostty",
+        "~/.config/opencode":      "opencode/.config/opencode",
+        "~/.config/starship.toml": "starship/.config/starship.toml"
+      },
+      "macos": {
+        "~/.stow-global-ignore":   "stow/.stow-global-ignore",
+        "~/.zshrc":                "zsh/.zshrc",
+        "~/.zprofile":             "zsh/.zprofile",
+        "~/.zsh/aliases.zsh":      "zsh/.zsh/aliases.zsh",
+        "~/.gitconfig":            "git/.gitconfig",
+        "~/.config/ripgrep":       "ripgrep/.config/ripgrep",
+        "~/.config/git/ignore":    "git/.config/git/ignore",
+        "~/.config/ghostty":       "ghostty/.config/ghostty",
+        "~/.config/opencode":      "opencode/.config/opencode",
+        "~/.config/starship.toml": "starship/.config/starship.toml"
+      },
+      "windows": {
+        "~/.stow-global-ignore":   "stow/.stow-global-ignore",
+        "~/.gitconfig":            "git/.gitconfig",
+        "~/.config/opencode":      "opencode/.config/opencode",
+        "~/.config/ripgrep":       "ripgrep/.config/ripgrep",
+        "~/.config/git/ignore":    "git/.config/git/ignore",
+        "~/.config/starship.toml": "starship/.config/starship.toml",
+        "<wt_settings>":           "win/terminal/settings.json",
+        "<ps_profile>":            "win/powershell/profile.ps1",
+        "<ps5_profile>":           "win/powershell/profile.ps1"
+      }
+    }
+  },
+
+  // ── CLI help ─────────────────────────────────────────────────
+  // ── Vault ────────────────────────────────────────────────────
+  // Which Bitwarden deployment the account lives on. Not a secret - and
+  // getting it wrong is worth naming, because `bw` silently defaults to the
+  // US cloud and an EU account then fails to log in with "Invalid master
+  // password", which sends you looking at your password rather than at the
+  // region. `doti secrets` sets this before it tries to unlock.
+  "vault": {
+    "server": "https://vault.bitwarden.eu"
+  },
+
+  // ── Secrets ──────────────────────────────────────────────────
+  // Files rendered from Bitwarden at install time. Never committed, and
+  // deliberately NOT stow packages: stow symlinks $HOME into this repo, so a
+  // stowed secret lives in the working tree and is one `git add -A` from
+  // being committed. These are written straight to their target instead.
+  //
+  //   mode "file"     - the whole file is one vault field (a secure note).
+  //                     For things with no public half worth templating.
+  //   mode "template" - a checked-in template with named holes.
+  //                     For mostly-public config with a few secret fields.
+  //
+  // PLACEHOLDER ITEM NAMES. Rotate the credentials first, then create the
+  // real Bitwarden items and point these at them.
+  "secrets": [
+    {
+      "name": "mssql-envs",
+      "mode": "file",
+      "item": "dotfiles/mssql-envs",
+      "field": "notes",
+      // NOT ~/.config/opencode/: that directory is a stow *fold* - a symlink
+      // into this repo - so rendering "into $HOME" there would write the
+      // credentials straight into the working tree. ~/.doti/ is a path no
+      // stow package can ever claim. doti refuses the folded case outright
+      // now, but the right target is the one that was never wrong.
+      "target": "~/.doti/mssql-envs.json",
+      "platforms": ["macos", "linux", "windows"]
+    }
+  ],
+
+  "cli": {
+    "description": "cross-platform dotfile installer (one Go binary: apps/doti in riptone/tone.rip)",
+    "options": [
+      { "flag": "(no args)",   "desc": "Interactive menu" },
+      { "flag": "install",     "desc": "Clone if needed, then packages, configs, secrets" },
+      { "flag": "adopt",       "desc": "Scan first, then install only the gaps" },
+      { "flag": "check",       "desc": "Verify tools and symlinks; --strict to exit non-zero" },
+      { "flag": "link",        "desc": "Link configs; --only PKG for one" },
+      { "flag": "unlink",      "desc": "Remove links; --restore to put backups back" },
+      { "flag": "sync",        "desc": "git pull --ff-only, then re-link" },
+      { "flag": "update",      "desc": "Upgrade installed packages" },
+      { "flag": "secrets",     "desc": "Render secret files from Bitwarden" },
+      { "flag": "upgrade",     "desc": "Replace the doti binary with the newest release" },
+      { "flag": "packages",    "desc": "Print the generated Brewfile / winget list" },
+      { "flag": "validate",    "desc": "Parse and check manifest.jsonc" },
+      { "flag": "-n",          "desc": "Dry run: report what would change, write nothing" },
+      { "flag": "version",     "desc": "Print the version" }
+    ],
+    "fresh_machine": "curl -fsSL https://raw.githubusercontent.com/riptone/tone.rip/main/apps/doti/scripts/install.sh | bash",
+    "existing_machine": "doti adopt"
+  }
+}

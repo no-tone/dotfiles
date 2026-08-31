@@ -1,0 +1,16 @@
+# ripgrep config — one CLI flag per line. Loaded via RIPGREP_CONFIG_PATH
+# (set in zsh/.zprofile and win/powershell/profile.ps1), so these defaults
+# apply to EVERY rg invocation: interactive, fzf, telescope, and scripts alike.
+# CLI args still override anything here.
+
+# Case-insensitive unless the pattern contains an uppercase letter.
+--smart-case
+
+# Follow symlinks and show a few lines of context by default.
+--max-columns=200
+--max-columns-preview
+
+# Nicer output.
+--colors=line:fg:yellow
+--colors=match:fg:green
+--colors=path:fg:blue

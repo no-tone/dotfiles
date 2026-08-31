@@ -1,0 +1,81 @@
+[user]
+  name = riptone
+  email = gh@tone.rip
+
+[core]
+  autocrlf = input
+  excludesFile = ~/.config/git/ignore
+  # Git for Windows bundles less. If using outside Git Bash, override pager in .gitconfig.local.
+  pager = less -FRX
+
+[diff]
+  algorithm = histogram
+  colorMoved = default
+
+[merge]
+  conflictstyle = zdiff3
+
+[rebase]
+  autosquash = true
+  autostash = true
+
+[push]
+  default = current
+  autoSetupRemote = true
+
+[pull]
+  rebase = true
+
+[fetch]
+  prune = true
+
+[init]
+  defaultBranch = main
+
+[status]
+  short = true
+  branch = true
+
+[branch]
+  sort = -committerdate
+
+[log]
+  date = relative
+
+[tag]
+  sort = version:refname
+
+[help]
+  autocorrect = 100
+
+[rerere]
+  enabled = true         # remember how you resolved a conflict, reuse it
+
+[include]
+  path = ~/.gitconfig.local
+
+[alias]
+  s = status
+  c = commit
+  p = push
+  l = log --oneline --graph --all
+  d = diff
+  ds = diff --staged
+  a = add
+  co = checkout
+  b = branch
+  f = fetch --prune
+  m = merge
+  r = rebase
+  ri = rebase --interactive
+  st = stash
+  lg = log --oneline --graph --all --decorate
+  adog = log --all --decorate --oneline --graph
+  undo = reset --soft HEAD~1
+  amend = commit --amend --no-edit
+  reword = commit --amend --only
+  unstage = reset HEAD --
+  discard = restore
+  pr = pull --rebase
+  recent = branch --sort=-committerdate --format='%(refname:short)  %(committerdate:relative)'
+  contributors = shortlog --summary --numbered

@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# This repository is data now: stow packages and a manifest. The installer
+# that used to live here - scripts/install.sh, scripts/Install.ps1,
+# scripts/Main.ps1 and the two bootstraps, 2,815 lines between them - is one
+# Go binary, `doti`, in the tone.rip monorepo. That monorepo's CI builds it,
+# tests it, and parses *this* manifest as part of its own suite, so there is
+# nothing left here to smoke-test on three operating systems.
+#
+# What is left is what only this repository can check.
+jobs:
+  secrets:
+    name: No credentials in the tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # gitleaks scans history, not just the tip, so a credential removed
+          # in the most recent commit is still found in the commit before it.
+          fetch-depth: 0
+
+      # The control that matters most here, and the one that was missing.
+      # Every config in this repository is symlinked into $HOME on every
+      # machine, so a secret committed here is a secret on all of them - and
+      # `git add -A` in a directory full of config files is how it happens.
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  manifest:
+    name: manifest.jsonc parses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # doti reads this file with a real JWCC parser. This is a cheaper
+      # version of the same question - "is it still parseable, and does it
+      # still have the keys the installer indexes into" - so a broken
+      # manifest fails here rather than on somebody's new laptop.
+      #
+      # Comments are stripped with a string-aware scanner, not a regex: the
+      # file contains a URL, and `//` inside a string is not a comment. That
+      # exact line silently truncated a value once.
+      - name: Parse it
+        run: |
+          python3 - <<'PY'
+          import json, re, sys
+
+          src = open("manifest.jsonc").read()
+          out, i, in_str, esc = [], 0, False, False
+          while i < len(src):
+              c = src[i]
+              if in_str:
+                  out.append(c)
+                  if esc: esc = False
+                  elif c == "\\": esc = True
+                  elif c == '"': in_str = False
+                  i += 1; continue
+              if c == '"':
+                  in_str = True; out.append(c); i += 1; continue
+              if src.startswith("//", i):
+                  while i < len(src) and src[i] != "\n": i += 1
+                  continue
+              out.append(c); i += 1
+
+          data = json.loads(re.sub(r",(\s*[}\]])", r"\1", "".join(out)))
+          required = ["app", "version", "stow_packages", "tools"]
+          missing = [k for k in required if k not in data]
+          if missing:
+              sys.exit(f"manifest.jsonc is missing {missing}")
+          print(f"{data['app']} {data['version']}: "
+                f"{len(data['stow_packages'])} stow packages, "
+                f"{len(data['tools'])} tools, "
+                f"{len(data.get('secrets', []))} secrets")
+          PY
+
+      - name: CLAUDE.md and AGENTS.md must stay identical
+        run: diff CLAUDE.md AGENTS.md

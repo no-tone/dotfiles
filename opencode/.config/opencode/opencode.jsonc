@@ -1,0 +1,177 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode/big-pickle",
+  "small_model": "opencode/deepseek-v4-flash-free",
+  "autoupdate": "notify",
+  // shell intentionally unset: let opencode auto-pick per-OS
+  // (macOS/Linux -> $SHELL; Windows -> pwsh/cmd). A hardcoded
+  // "/bin/zsh" does not exist on Windows and breaks shell tooling.
+  "default_agent": "code",
+  "permission": {
+    "edit": "ask",
+    "bash": {
+      "*": "ask",
+      "rm -rf /*": "deny",
+      "rm -rf ~*": "deny",
+      "sudo *": "deny",
+      "su *": "deny",
+      "doas *": "deny",
+      "chown *": "deny",
+      "chflags *": "deny",
+      "dd *": "deny",
+      "mkfs *": "deny",
+      "diskutil *": "deny",
+      "systemctl *": "deny",
+      "launchctl *": "deny",
+      "curl * | bash": "deny",
+      "curl * | sh": "deny",
+      "wget * | bash": "deny",
+      "wget * | sh": "deny",
+      "git push --force *": "deny",
+      "git push -f *": "deny",
+      "git reset --hard *": "deny",
+      "git clean -fdx *": "deny",
+      "git clean -fd *": "deny",
+      "git clean -f *": "deny",
+      "git clean *": "deny",
+      "git checkout -- *": "deny",
+      "git stash drop *": "deny",
+      "npm publish *": "deny",
+      "pip install --break-system-packages *": "deny",
+      "apt *": "deny",
+      "apt-get *": "deny",
+      "brew install --force *": "deny",
+      "brew uninstall *": "deny",
+      // Read-only file inspection
+      "ls *": "allow", "cat *": "allow", "head *": "allow", "tail *": "allow",
+      "wc *": "allow", "sort *": "allow", "uniq *": "allow", "diff *": "allow",
+      "file *": "allow", "stat *": "allow",
+      // File system ops
+      "mkdir *": "allow", "touch *": "allow", "cp *": "allow",
+      "mv *": "allow", "chmod *": "allow", "ln -s *": "allow",
+      "mktemp *": "allow", "realpath *": "allow", "readlink *": "allow",
+      "dirname *": "allow", "basename *": "allow",
+      "tar *": "allow", "zip *": "allow", "unzip *": "allow",
+      // Search
+      "rg *": "allow", "fd *": "allow", "find *": "allow",
+      "grep *": "allow", "sed *": "allow", "awk *": "allow",
+      // Info
+      "echo *": "allow", "printf *": "allow", "pwd": "allow",
+      "which *": "allow", "type *": "allow", "command *": "allow",
+      "env": "allow", "date *": "allow", "uname *": "allow",
+      "whoami": "allow", "id": "allow", "ps *": "allow",
+      // VCS
+      "git *": "allow", "gh *": "allow",
+      // Package managers
+      "brew *": "allow", "npm *": "allow", "npx *": "allow",
+      "pnpm *": "allow", "yarn *": "allow", "bun *": "allow",
+      "pip *": "allow", "pip3 *": "allow", "cargo *": "allow", "go *": "allow",
+      // Runtimes
+      "node *": "allow", "deno *": "allow",
+      "python3 *": "allow", "ruby *": "allow",
+      // Network
+      "curl *": "allow", "wget *": "allow", "ping *": "allow",
+      "dig *": "allow", "host *": "allow",
+      // Build tools
+      "make *": "allow", "cmake *": "allow",
+      "tsc *": "allow", "eslint *": "allow", "prettier *": "allow",
+      // macOS specific
+      "open ./*": "allow", "open ~/*": "allow",
+      "open -R ./*": "allow", "open -R ~/*": "allow", "qlmanage *": "allow",
+      "sw_vers *": "allow", "system_profiler *": "allow", "ioreg *": "allow",
+      "mdfind *": "allow"
+    },
+    "read": {
+      ".env": "deny",
+      ".env.*": "deny",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*": "allow"
+    }
+  },
+  "provider": {
+    "anthropic": { "options": { "timeout": 600000, "chunkTimeout": 30000 } }
+  },
+  "instructions": [
+    "~/.config/opencode/caveman-default.md",
+    "Assume CI=true. No editors/pagers. Use yes/force flags always. Git: -m, --no-edit, --no-pager. No interactive: vim, nano, less, more, man."
+  ],
+  "skills": {
+    "paths": ["~/.claude/skills", "~/.agents/skills"]
+  },
+  "plugin": [
+    "oh-my-opencode-slim@2.2.17",
+    "opencode-websearch-cited@1.2.0",
+    "@tarquinen/opencode-dcp@3.1.15",
+    "opencode-claude-auth@2.1.6",
+    "@dietrichgebert/ponytail@4.9.0",
+    "openslimedit@1.0.4"
+  ],
+  "mcp": {
+    "context7": {
+      "type": "local",
+      // globally installed: npm install -g @upstash/context7-mcp
+      "command": ["context7-mcp"],
+      "enabled": true
+    },
+    "sqlite-tools": {
+      "type": "local",
+      // globally installed: npm install -g mcp-sqlite-tools
+      "command": ["mcp-sqlite-tools"],
+      "enabled": false
+    },
+
+    "mssql": {
+      "type": "local",
+      // globally installed: npm install -g @connorbritain/mssql-mcp-server
+      "command": ["mssql-mcp-server"],
+      // disabled by default — only enable when working with MSSQL databases
+      "enabled": false,
+      "environment": {
+        "ENVIRONMENTS_CONFIG_PATH": "~/.doti/mssql-envs.json"
+      }
+    },
+    "fetch": {
+      "type": "local",
+      // globally installed: npm install -g mcp-fetch-server
+      // disabled globally — enable per-agent via oh-my-opencode-slim.jsonc
+      "command": ["mcp-fetch-server"],
+      "enabled": false
+    }
+  },
+  "command": {
+    "test": { "template": "Run tests and report failures. Fix any broken tests.", "description": "Run and fix tests" },
+    "lint": { "template": "Run the linter. Format and fix any auto-fixable issues, then report remaining problems.", "description": "Lint and format code" },
+    "typecheck": { "template": "Run the type checker. Fix all type errors found.", "description": "Run and fix type checks" },
+    "deploy": { "template": "Deploy the current project. Check for uncommitted changes first, then build and deploy.", "description": "Deploy project" },
+    "fix": { "template": "Find and fix bugs in the current file or related files. Run tests after fixing.", "description": "Fix bugs in current context" }
+  },
+  "compaction": { "auto": true, "reserved": 8000 },
+  "formatter": {
+    "biome": {
+      "command": ["npx", "--yes", "@biomejs/biome@1.9.4", "format", "--write"],
+      "extensions": [".js", ".jsx", ".ts", ".tsx", ".css", ".json", ".jsonc", ".astro"]
+    }
+  },
+  "experimental": {
+    "policies": [
+      {
+        "effect": "deny",
+        "action": "provider.use",
+        "resource": "openai*"
+      }
+    ]
+  },
+  "watcher": {
+    "ignore": [
+      "node_modules/**", "dist/**", ".git/**",
+      "target/**", "build/**", ".next/**",
+      ".angular/**", ".astro/**",
+      ".cache/**", "__pycache__/**", "*.pyc",
+      ".DS_Store", "*.swp", "*.swo",
+      "*.log", ".env*",
+      "vendor/**", ".bundle/**",
+      ".terraform/**", "*.tfstate*"
+    ]
+  }
+}

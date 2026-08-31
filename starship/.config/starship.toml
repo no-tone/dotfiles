@@ -1,0 +1,67 @@
+"$schema" = 'https://starship.rs/config-schema.json'
+
+# Two-line prompt (context line, then a blank prompt line) with colors matching
+# the Tokyo Night theme already used by ghostty, the opencode TUI, and Windows
+# Terminal — same accent hexes as that theme, not invented here.
+add_newline = true
+
+format = """
+$directory\
+$git_branch\
+$git_status\
+$nodejs\
+$python\
+$rust\
+$golang\
+$java\
+$cmd_duration\
+$fill\
+$time\
+$line_break\
+$character"""
+
+palette = "tokyonight"
+
+[palettes.tokyonight]
+blue    = "#7aa2f7"
+green   = "#9ece6a"
+purple  = "#bb9af7"
+yellow  = "#e0af68"
+red     = "#f7768e"
+comment = "#565f89"
+
+[directory]
+style = "bold blue"
+truncation_length = 4
+truncate_to_repo = true
+
+[git_branch]
+symbol = " "
+style = "bold purple"
+format = "on [$symbol$branch]($style) "
+
+[git_status]
+style = "bold red"
+format = "([$all_status$ahead_behind]($style)) "
+
+[nodejs]
+symbol = " "
+style = "bold green"
+
+[cmd_duration]
+min_time = 2_000
+style = "bold yellow"
+format = "took [$duration]($style) "
+
+[fill]
+symbol = " "
+
+[time]
+disabled = false
+style = "comment"
+format = "[$time]($style)"
+time_format = "%H:%M"
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
