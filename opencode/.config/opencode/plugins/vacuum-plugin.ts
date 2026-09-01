@@ -12,14 +12,16 @@
 // "Vacuum only" just reclaims free pages. The currently open session is always
 // protected.
 //
-// IMPORTANT: TUI plugins are NOT auto-discovered from the plugin/ directory.
-// This file must be referenced from `tui.json` (the installer does that):
-//   { "plugin": ["./vacuum-plugin.ts"] }
+// IMPORTANT: TUI plugins are NOT auto-discovered from the plugins/ directory.
+// This file must be referenced from `tui.jsonc`:
+//   { "plugin": ["./plugins/vacuum-plugin.ts"] }
 //
-// The planning, rule matching, and vacuum logic live in ./vacuum.mjs.
+// The planning, rule matching, and vacuum logic live in ./vacuum.mjs, shared
+// helpers in ./shared.mjs.
 
 import type { TuiPlugin } from "@opencode-ai/plugin/tui"
-import { applyRules, buildResultMessage, dbPath, fmtBytes, planPrune, readOpts, vacuum } from "./vacuum.mjs"
+import { fmtAge, fmtBytes } from "./shared.mjs"
+import { applyRules, buildResultMessage, dbPath, planPrune, readOpts, vacuum } from "./vacuum.mjs"
 
 const DAY = 86_400_000
 const MB = 1024 * 1024
@@ -255,7 +257,9 @@ const tui: TuiPlugin = async (api) => {
         }
 
         const confirmPrune = (matches: ReturnType<typeof match>["matches"], estReclaim: number) => {
-          const top = matches.slice(0, 8).map((s) => `  ${fmtBytes(s.bytes).padStart(9)}  ${s.title.slice(0, 50)}`)
+          const top = matches
+            .slice(0, 8)
+            .map((s) => `  ${fmtBytes(s.bytes).padStart(9)}  ${fmtAge(s.age).padStart(4)} old  ${s.title.slice(0, 44)}`)
           const more = matches.length - Math.min(8, matches.length)
           const message = [
             `Delete ${matches.length} session(s), freeing ~${fmtBytes(estReclaim)}, then VACUUM?`,
@@ -280,7 +284,7 @@ const tui: TuiPlugin = async (api) => {
           stack.replace(() =>
             api.ui.DialogConfirm({
               title: "OpenCode Vacuum",
-              message: `Run VACUUM on ${fmtBytes(plan.dbSize)} to defragment and reclaim any free pages? No sessions are deleted.`,
+              message: `Run VACUUM on ${fmtBytes(plan.dbSize)} of database (including the WAL) to defragment and reclaim any free pages? No sessions are deleted.`,
               onConfirm: () => void run([]),
               onCancel: () => openPanel({ kind: "action", action: "vacuum" }),
             }),

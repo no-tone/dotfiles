@@ -33,7 +33,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   manifest:
-    name: manifest.jsonc parses
+    name: manifest.jsonc parses and matches its schema
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -49,7 +49,7 @@ jobs:
       - name: Parse it
         run: |
           python3 - <<'PY'
-          import json, re, sys
+          import json, os, re, sys
 
           src = open("manifest.jsonc").read()
           out, i, in_str, esc = [], 0, False, False
@@ -77,6 +77,44 @@ jobs:
                 f"{len(data['stow_packages'])} stow packages, "
                 f"{len(data['tools'])} tools, "
                 f"{len(data.get('secrets', []))} secrets")
+
+          # Hand the comment-free JSON to the schema step, so the scanner above
+          # stays the only copy of the JWCC stripping in this file.
+          json.dump(data, open(os.environ["RUNNER_TEMP"] + "/manifest.json", "w"))
+          PY
+
+      # AGENTS.md says of manifest.schema.json: "It is the editor's
+      # autocomplete and CI validates against it." This is that half. Without
+      # it the schema drifts silently and the only symptom is autocomplete
+      # that lies - `additionalProperties: false` everywhere means a field the
+      # schema has not been told about is a hard error, which is exactly the
+      # signal we want on the PR that adds one.
+      #
+      # A venv because the runner's system Python is PEP 668 externally
+      # managed, and jsonschema because the schema is draft 2020-12.
+      - name: Validate against manifest.schema.json
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet jsonschema
+          "$RUNNER_TEMP/venv/bin/python" - <<'PY'
+          import json, os, sys
+          from jsonschema import Draft202012Validator
+
+          schema = json.load(open("manifest.schema.json"))
+          # A malformed schema would otherwise "validate" anything at all.
+          Draft202012Validator.check_schema(schema)
+          data = json.load(open(os.environ["RUNNER_TEMP"] + "/manifest.json"))
+
+          errors = sorted(Draft202012Validator(schema).iter_errors(data),
+                          key=lambda e: list(e.absolute_path))
+          for e in errors:
+              where = "/".join(str(p) for p in e.absolute_path) or "(root)"
+              print(f"{where}: {e.message}", file=sys.stderr)
+          if errors:
+              sys.exit(f"manifest.jsonc does not match manifest.schema.json "
+                       f"({len(errors)} error(s))")
+          print(f"manifest.jsonc matches manifest.schema.json "
+                f"({len(data['tools'])} tools, {len(data['stow_packages'])} stow packages checked)")
           PY
 
       - name: CLAUDE.md and AGENTS.md must stay identical

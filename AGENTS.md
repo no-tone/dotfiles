@@ -45,6 +45,16 @@ how linking works, fixing the health check — all of that is a change to
 - Pin third-party plugin versions (e.g. `oh-my-opencode-slim@2.2.8`) and MCP
   npx commands. Only built-in opencode plugins stay unpinned. An unpinned
   version is a registry round trip on every startup.
+- A pinned plugin must **not** also appear in the manifest's `mcps`. OpenCode
+  installs plugin packages itself, one full `node_modules` per pinned version,
+  under `~/.cache/opencode/packages/` — a second global copy is dead weight.
+  `mcps` is for MCP *servers*, and every entry there must be named by an
+  `mcp.<name>.command` in `opencode.jsonc`. `/versions` reports and clears that
+  cache; nothing else does, on any platform.
+- OpenCode itself: brew (`anomalyco/tap`) on macOS/Linux, `bun install -g
+  opencode-ai` on Windows via the manifest's `bun` field — the winget package
+  lags upstream by patches. A new field like that is data here but behaviour in
+  `apps/doti`: it does nothing until doti reads it.
 - A tool installed outside a package manager puts its PATH/env in the tracked
   `zsh/.zprofile`, **not** in the line its own installer appends to
   `~/.zshrc` — that file is a symlink into this repo and the next re-link

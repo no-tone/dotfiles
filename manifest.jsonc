@@ -58,6 +58,7 @@
     { "cmd": "git",      "brew": "git",      "winget": "Git.Git" },
     { "cmd": "curl",     "brew": "curl",     "winget": "cURL.cURL" },
     { "cmd": "node",     "brew": "node",     "winget": "OpenJS.NodeJS" },
+    { "cmd": "bun",      "brew": "bun",      "winget": "Oven-sh.Bun" },
     { "cmd": "stow",     "brew": "stow" },
     { "cmd": "rg",       "brew": "ripgrep",  "winget": "BurntSushi.ripgrep.MSVC" },
     { "cmd": "fd",       "brew": "fd",       "winget": "sharkdp.fd" },
@@ -70,6 +71,18 @@
     { "cmd": "starship", "brew": "starship", "winget": "Starship.Starship" },
     { "cmd": "code",     "winget": "Microsoft.VisualStudioCode" },
     { "cmd": "rtk",      "brew": "rtk",      "winget": "rtk-ai.rtk" },
+    // macOS/Linux: the tap, not homebrew-core: opencode's own docs recommend
+    // it, and core lagged upstream by five patches when this was written
+    // (1.18.20 vs 1.18.25). `brew list` answers with the short name, so
+    // pkgs.Formula bridges the two spellings.
+    //
+    // Windows: bun, not winget. SST.opencode sat on 1.18.21 while every other
+    // channel shipped 1.18.25, and a version behind on the agent that edits
+    // this repo is not worth the tidiness. `bun install -g opencode-ai` tracks
+    // latest, and opencode's own `opencode upgrade` detects a bun install and
+    // self-upgrades the same way. "bun" is listed above this entry, so it is
+    // already installed by the time doti gets here.
+    { "cmd": "opencode", "brew": "anomalyco/tap/opencode", "bun": "opencode-ai" },
     // Needed before `doti secrets` can render anything - see "secrets" below.
     { "cmd": "bw",       "brew": "bitwarden-cli", "winget": "Bitwarden.CLI" }
   ],
@@ -109,16 +122,20 @@
   ],
 
   // ── NPM global packages ─────────────────────────────────
-  // OpenCode MCP servers + token-reduction plugins, installed globally
-  // to avoid npx overhead. Each entry: `npm install -g <name>`.
+  // OpenCode MCP *servers*, installed globally to avoid npx overhead. Each
+  // entry: `npm install -g <name>`. Every one of these must be named by an
+  // `mcp.<name>.command` in opencode.jsonc — otherwise it is 50 MB of
+  // node_modules nothing ever runs.
+  //
+  // OpenCode *plugins* do NOT belong here. A pinned entry in opencode.jsonc's
+  // "plugin" array makes OpenCode install the package itself, into its own
+  // cache (~/.cache/opencode/packages/<name>@<version>); a second global copy
+  // is dead weight. `/versions` reports and clears that cache.
   "mcps": [
     "mcp-sqlite-tools",
     "mcp-fetch-server",
     "@upstash/context7-mcp",
-    "@connorbritain/mssql-mcp-server",
-    "opencode-snip",
-    "snip",
-    "openslimedit"
+    "@connorbritain/mssql-mcp-server"
   ],
 
   // ── System components (non-stow) ─────────────────────────────

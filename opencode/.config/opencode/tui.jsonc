@@ -1,8 +1,12 @@
 {
   "$schema": "https://opencode.ai/tui.json",
   // TUI plugins are NOT auto-discovered — they must be declared here.
-  // opencode-vacuum: /vacuum (alias /compactdb) prunes old sessions + VACUUMs
-  // the DB to reclaim space. Engine in ./plugins/vacuum.mjs.
+  //   /vacuum   (alias /compactdb) — prune old sessions by rule, then VACUUM the
+  //             SQLite store to reclaim the freed pages.
+  //   /versions (alias /updates, /check-versions) — re-pin plugins to their
+  //             latest npm version and clear the plugin package cache.
+  // Engines: ./plugins/vacuum.mjs and ./plugins/versions.mjs; paths and
+  // formatting shared via ./plugins/shared.mjs.
   "plugin": ["./plugins/vacuum-plugin.ts", "./plugins/versions-plugin.ts"],
   "scroll_speed": 3,
   "scroll_acceleration": { "enabled": true },

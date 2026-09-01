@@ -15,14 +15,14 @@
 // VACUUM only reclaims pages freed by deletions; with nothing deleted it just
 // defragments. Prefers `bun:sqlite` (OpenCode's runtime), falls back to the
 // built-in `node:sqlite` (Node 22+).
+//
+// Paths and formatting come from ./shared.mjs.
 
-import { execSync } from "node:child_process"
-import fs from "node:fs"
+import { spawn } from "node:child_process"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-
-const DAY = 86_400_000
+import { fileSize, fmtBytes, xdgDir } from "./shared.mjs"
 
 // ---- config -----------------------------------------------------------------
 
@@ -48,16 +48,18 @@ export function readOpts(env = process.env) {
   }
 }
 
-// Resolve the OpenCode database path the same way OpenCode does (XDG aware),
-// with optional overrides for non-standard setups.
+// The database file. OPENCODE_DB is OpenCode's own variable (it also accepts
+// ":memory:", which has no file to vacuum); otherwise the database sits in the
+// data directory, which follows XDG_DATA_HOME. See ./shared.mjs.
 export function dbPath() {
-  if (process.env.OPENCODE_DB) return process.env.OPENCODE_DB
-  const data =
-    process.env.OPENCODE_DATA_DIR ??
-    (process.env.XDG_DATA_HOME
-      ? path.join(process.env.XDG_DATA_HOME, "opencode")
-      : path.join(os.homedir(), ".local", "share", "opencode"))
-  return path.join(data, "opencode.db")
+  return process.env.OPENCODE_DB || path.join(xdgDir("data"), "opencode.db")
+}
+
+// The database is three files — .db, -wal, -shm — and a checkpoint moves bytes
+// between them, so a report that only looks at the .db can claim to have
+// reclaimed nothing while freeing megabytes of WAL. Always size the set.
+export function dbBytes(file = dbPath()) {
+  return fileSize(file) + fileSize(`${file}-wal`) + fileSize(`${file}-shm`)
 }
 
 // ---- sqlite (bun:sqlite preferred, node:sqlite fallback) --------------------
@@ -83,6 +85,8 @@ async function open(file, { readonly }) {
 
 // ---- planning (read-only) ---------------------------------------------------
 
+// CAST(data AS BLOB) so LENGTH() counts bytes: on a TEXT column it would count
+// characters, undercounting every multi-byte one.
 const PLAN_SQL = `
   SELECT
     s.id          AS id,
@@ -97,7 +101,7 @@ const PLAN_SQL = `
     COALESCE(ev.bytes, 0) AS bytes
   FROM session s
   LEFT JOIN (
-    SELECT aggregate_id, SUM(LENGTH(data)) AS bytes FROM event GROUP BY aggregate_id
+    SELECT aggregate_id, SUM(LENGTH(CAST(data AS BLOB))) AS bytes FROM event GROUP BY aggregate_id
   ) ev ON ev.aggregate_id = s.id
 `
 
@@ -143,7 +147,7 @@ export async function planPrune({ file = dbPath(), now = Date.now(), activeId } 
     active: activeTree.has(r.id),
   }))
 
-  return { file, now, totalSessions: rows.length, sessions, dbSize: fileSize(file) }
+  return { file, now, totalSessions: rows.length, sessions, dbSize: dbBytes(file) }
 }
 
 // Select sessions to delete from the annotated list, given the user's rules.
@@ -187,60 +191,104 @@ export function applyRules(sessions, rules) {
 
 // ---- vacuum -----------------------------------------------------------------
 
-// Spawns a child process for the actual VACUUM because:
-//   1. VACUUM requires exclusive access — openCode's own DB connection would
+// The actual VACUUM runs in a child process because:
+//   1. VACUUM requires exclusive access — OpenCode's own DB connection would
 //      block it if run inline.
-//   2. openCode's bundled JS runtime may not expose node:sqlite (or may have
-//      restricted module loading), while the system Node.js definitely does.
+//   2. OpenCode's bundled JS runtime may not expose node:sqlite (or may have
+//      restricted module loading), while a plain Node.js or Bun does.
 //   3. The child gets a clean SQLite connection with no active statements.
+//
+// Runtimes are tried in order and the first one present wins. Bun first:
+// OpenCode itself runs on Bun, so it is the runtime an OpenCode user is most
+// likely to have, and `bun:sqlite` is built in. Node.js is the fallback.
+// `process.execPath` is deliberately NOT used: inside OpenCode that is the
+// compiled OpenCode binary, which cannot run a script file.
+//
+// The last candidate is Bun's canonical install path, for when the TUI was
+// launched from a GUI with a minimal PATH that has neither on it.
+const RUNTIMES = [
+  "bun",
+  "node",
+  path.join(os.homedir(), ".bun", "bin", process.platform === "win32" ? "bun.exe" : "bun"),
+]
+
+function helperPath() {
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "vacuum-run.mjs")
+}
+
+// Spawn once. Resolves { missing: true } when the runtime is not installed, so
+// the caller can try the next one. No shell: arguments are passed as an array,
+// which keeps paths with spaces working identically on Windows and POSIX.
+function spawnOnce(cmd, args, timeout) {
+  return new Promise((resolve, reject) => {
+    let child
+    try {
+      child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true })
+    } catch (err) {
+      return err?.code === "ENOENT" ? resolve({ missing: true }) : reject(err)
+    }
+    let stdout = "", stderr = ""
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL")
+      reject(new Error(`VACUUM timed out after ${Math.round(timeout / 1000)}s`))
+    }, timeout)
+    child.stdout?.on("data", (d) => { stdout += d })
+    child.stderr?.on("data", (d) => { stderr += d })
+    child.on("error", (err) => {
+      clearTimeout(timer)
+      // ENOENT: no such runtime. EINVAL/EACCES: found but not executable here.
+      if (err?.code === "ENOENT") resolve({ missing: true })
+      else reject(err)
+    })
+    child.on("close", (code) => {
+      clearTimeout(timer)
+      resolve({ code, stdout, stderr })
+    })
+  })
+}
+
+// Never uses stdio "inherit": the parent's stdout is the TUI's screen.
+async function runHelper(args, { timeout = 120_000 } = {}) {
+  const helper = helperPath()
+  const wanted = process.env.OPENCODE_VACUUM_RUNTIME // ours, for a non-standard install
+  const runtimes = wanted ? [wanted] : RUNTIMES
+  for (const runtime of runtimes) {
+    const res = await spawnOnce(runtime, [helper, ...args], timeout)
+    if (res.missing) continue
+    if (res.code !== 0) {
+      const detail = (res.stderr || res.stdout || "").trim()
+      throw new Error(`${runtime} exited with code ${res.code}${detail ? `:\n${detail}` : ""}`)
+    }
+    return res
+  }
+  throw new Error(
+    `No JavaScript runtime found to run the VACUUM helper (tried ${runtimes.join(", ")}). ` +
+      "Install Bun or Node.js, or set OPENCODE_VACUUM_RUNTIME to a runtime that can run a .mjs file.",
+  )
+}
 
 export async function vacuum({ file = dbPath() } = {}) {
-  const before = fileSize(file)
-  const helper = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "vacuum-run.mjs")
-  execSync(`node "${helper}" --db "${file}"`, {
-    shell: true,
-    stdio: "inherit",
-    timeout: 120_000,
-    windowsHide: true,
-    maxBuffer: 1 * 1024 * 1024,
-  })
-  const after = fileSize(file)
+  if (file === ":memory:") {
+    throw new Error("OPENCODE_DB is set to :memory: — there is no database file to vacuum.")
+  }
+  const before = dbBytes(file)
+  await runHelper(["--db", file])
+  const after = dbBytes(file)
   return { file, before, after, freed: Math.max(0, before - after) }
 }
 
 // ---- formatting -------------------------------------------------------------
 
-function fileSize(file) {
-  try {
-    return fs.statSync(file).size
-  } catch {
-    return 0
-  }
-}
-
-export function fmtBytes(n) {
-  if (n >= 1024 ** 3) return (n / 1024 ** 3).toFixed(2) + " GB"
-  if (n >= 1024 ** 2) return (n / 1024 ** 2).toFixed(1) + " MB"
-  if (n >= 1024) return (n / 1024).toFixed(1) + " KB"
-  return `${Math.round(n)} B`
-}
-
-export function fmtAge(ms) {
-  const d = Math.floor(ms / DAY)
-  if (d >= 365) return `${Math.floor(d / 365)}y`
-  if (d >= 1) return `${d}d`
-  const h = Math.floor(ms / 3_600_000)
-  return `${h}h`
-}
-
 export function buildResultMessage(result, vac) {
   const lines = ["OpenCode Vacuum - done", ""]
   if (result.deleted.length || result.failed.length) {
-    lines.push(`Deleted ${result.deleted.length} session(s)` + (result.failed.length ? `, ${result.failed.length} failed.` : "."))
+    lines.push(
+      `Deleted ${result.deleted.length} session(s)` + (result.failed.length ? `, ${result.failed.length} failed.` : "."),
+    )
   } else {
     lines.push("No sessions deleted.")
   }
-  lines.push(`Database: ${fmtBytes(vac.before)} -> ${fmtBytes(vac.after)}  (reclaimed ${fmtBytes(vac.freed)})`)
+  lines.push(`Database: ${fmtBytes(vac.before)} -> ${fmtBytes(vac.after)}  (reclaimed ${fmtBytes(vac.freed)}, including the WAL)`)
   if (result.failed.length) {
     lines.push("", "Failed to delete:")
     for (const c of result.failed.slice(0, 5)) lines.push(`  ${c.title.slice(0, 56)}`)

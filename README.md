@@ -218,7 +218,8 @@ doti packages           # print both
 doti packages --brew    # Brewfile only
 ```
 
-- **CLI:** git, curl, node, jq, ripgrep, fd, fzf, zoxide, eza, bat, starship, rtk, bitwarden-cli
+- **CLI:** git, curl, node, bun, jq, ripgrep, fd, fzf, zoxide, eza, bat, starship,
+  rtk, opencode, bitwarden-cli
 - **zsh:** zsh-autosuggestions, zsh-fast-syntax-highlighting (PSReadLine on Windows)
 - **GUI:** Visual Studio Code, Brave, **Ghostty** (macOS/Linux) or Windows Terminal
 - **macOS only:** hiddenbar, ghostty
@@ -237,12 +238,16 @@ doti unlink --restore            # and move the newest backups back
 doti unlink --only ghostty       # just one component
 ```
 
-None of these touch installed **tools** — remove those with `brew uninstall`
-or `winget uninstall`.
+None of these touch installed **tools** — remove those with `brew uninstall`,
+`winget uninstall`, or (OpenCode on Windows) `bun remove -g opencode-ai`.
 
 ## Notes
 
 - `-n` previews any command that writes, without touching disk.
+- **OpenCode on Windows comes from bun**, not winget: `SST.opencode` sat on
+  1.18.21 while every other channel shipped 1.18.25. The manifest says
+  `"bun": "opencode-ai"` for that tool, `bun install -g` tracks latest, and
+  `opencode upgrade` detects a bun install and self-upgrades the same way.
 - Casks are emitted with `if OS.mac?`, so one generated Brewfile is valid on
   Linux too and `brew bundle` decides.
 - `doti install` passes `--no-upgrade`: installing a missing tool should not
@@ -315,8 +320,8 @@ re-reads it on every prompt, no reload needed.
 
 | Command | Does |
 |---|---|
-| `/vacuum` (alias `/compactdb`) | Prunes old sessions by rule (age / size / keep-per-folder) and reclaims SQLite space. Run when idle — needs exclusive DB access. |
-| `/versions` (alias `/updates`, `/check-versions`) | Checks this repo's pinned plugin versions in `opencode.jsonc` against the npm registry, offers to bump them in place. |
+| `/vacuum` (alias `/compactdb`) | Prunes old sessions by rule (age / size / keep-per-folder) and reclaims SQLite space — sizes include the WAL, since a checkpoint moves bytes between the two. Run when idle: the `VACUUM` itself runs in a child process (bun, else node) because it needs exclusive DB access. |
+| `/versions` (alias `/updates`, `/check-versions`) | A panel over everything to do with pinned plugins. **Update plugins** checks each pin in `opencode.jsonc` against the npm registry and rewrites it in place, comments intact. **Clear old versions** and **Clear unused packages** delete cached package directories under `~/.cache/opencode/packages` — OpenCode installs a whole `node_modules` per pinned version (hundreds of MB each) and never cleans up. Updating clears the versions it supersedes. A cached package named in any config file is reported but never deleted. |
 
 **Windows PowerShell git-alias gotcha** — `gs` / `gd` / `ga` work, but
 `gc` / `gp` / `gl` are deliberately **not** overridden (they're core

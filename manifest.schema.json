@@ -70,11 +70,15 @@
           },
           "brew": {
             "type": "string",
-            "description": "Homebrew formula name (macOS/Linux)"
+            "description": "Homebrew formula name (macOS/Linux). May be tap-qualified (user/tap/formula) when core lags upstream; `brew list` still answers with the short name, which doti accounts for."
           },
           "winget": {
             "type": "string",
             "description": "winget package ID (Windows)"
+          },
+          "bun": {
+            "type": "string",
+            "description": "npm package name installed with `bun install -g` (Windows). Use instead of winget when the winget package lags upstream; bun tracks latest and the tool's own self-upgrade follows suit. Requires the \"bun\" tool to be listed earlier in tools[]."
           },
           "app": {
             "type": "string",
