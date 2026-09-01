@@ -18,7 +18,7 @@ async function open(file) {
   if (typeof globalThis.Bun !== "undefined") {
     const { Database } = await import("bun:sqlite")
     const db = new Database(file)
-    return { exec: (sql) => db.run(sql), close: () => db.close() }
+    return { exec: (sql) => db.run(sql), all: (sql) => db.query(sql).all(), close: () => db.close() }
   }
   let DatabaseSync
   try {
@@ -27,7 +27,19 @@ async function open(file) {
     throw new Error(`no SQLite binding in this runtime (node:sqlite needs Node 22+): ${err.message}`)
   }
   const db = new DatabaseSync(file, { readOnly: false })
-  return { exec: (sql) => db.exec(sql), close: () => db.close() }
+  return { exec: (sql) => db.exec(sql), all: (sql) => db.prepare(sql).all(), close: () => db.close() }
+}
+
+// PRAGMA wal_checkpoint(TRUNCATE) returns one row: busy, log, checkpointed.
+// busy = 1 means another connection held a read lock and the WAL could NOT be
+// folded back in — the caller needs to know, because the files stay big.
+function checkpoint(db) {
+  try {
+    const row = db.all("PRAGMA wal_checkpoint(TRUNCATE)")?.[0] ?? {}
+    return { busy: Number(row.busy ?? 0), log: Number(row.log ?? 0), checkpointed: Number(row.checkpointed ?? 0) }
+  } catch (err) {
+    return { busy: 1, error: err.message }
+  }
 }
 
 async function main() {
@@ -39,13 +51,20 @@ async function main() {
   if (!fs.existsSync(file)) throw new Error(`Database not found: ${file}`)
 
   const db = await open(file)
+  let after
   try {
     db.exec("PRAGMA busy_timeout = 15000")
-    db.exec("PRAGMA wal_checkpoint(TRUNCATE)")
+    checkpoint(db) // fold any pending WAL in first, so VACUUM sees everything
     db.exec("VACUUM")
+    // VACUUM in WAL mode rewrites every page *through the WAL*, so the -wal
+    // file is now roughly the size of the whole database. Without this second
+    // checkpoint the vacuum looks like it doubled the footprint on disk.
+    after = checkpoint(db)
   } finally {
     db.close()
   }
+  // One line of JSON on stdout for the parent to fold into its report.
+  console.log(JSON.stringify({ checkpoint: after }))
 }
 
 main().catch((err) => {

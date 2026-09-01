@@ -320,7 +320,7 @@ re-reads it on every prompt, no reload needed.
 
 | Command | Does |
 |---|---|
-| `/vacuum` (alias `/compactdb`) | Prunes old sessions by rule (age / size / keep-per-folder) and reclaims SQLite space — sizes include the WAL, since a checkpoint moves bytes between the two. Run when idle: the `VACUUM` itself runs in a child process (bun, else node) because it needs exclusive DB access. |
+| `/vacuum` (alias `/compactdb`) | Prunes sessions by rule — **folder** (all / other folders only / this folder only), age, size, keep-per-folder, protect-shared — then reclaims SQLite space. Sizes include the WAL: a `VACUUM` in WAL mode rewrites every page *through* the log, so it checkpoints again afterwards or the footprint looks doubled. Run when idle: the `VACUUM` runs in a child process (bun, else node) because it needs exclusive DB access. |
 | `/versions` (alias `/updates`, `/check-versions`) | A panel over everything to do with pinned plugins. **Update plugins** checks each pin in `opencode.jsonc` against the npm registry and rewrites it in place, comments intact. **Clear old versions** and **Clear unused packages** delete cached package directories under `~/.cache/opencode/packages` — OpenCode installs a whole `node_modules` per pinned version (hundreds of MB each) and never cleans up. Updating clears the versions it supersedes. A cached package named in any config file is reported but never deleted. |
 
 **Windows PowerShell git-alias gotcha** — `gs` / `gd` / `ga` work, but

@@ -3,6 +3,7 @@
 //
 // Registers a `/vacuum` slash command that opens a settings-style panel where you
 // dial in prune rules:
+//   - Folder:          all folders / other folders only / this folder only
 //   - Older than:      off / 1 day / 7 days / 30 days / 6 months / all sessions
 //   - Larger than:     off / 10 / 50 / 100 / 500 MB / 1 GB / custom
 //   - Keep per folder: always keep the N newest per folder (1, 5, 100, custom...)
@@ -29,6 +30,7 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 30))
 
 type Age = number | "all" | null
 type Bytes = number | null
+type Folder = "all" | "current" | "others"
 
 // Cycle presets for each rule. A `custom` step opens a prompt instead of setting.
 const AGE_STEPS: { v: Age; label: string }[] = [
@@ -48,6 +50,13 @@ const SIZE_STEPS: { v?: Bytes; custom?: boolean; label: string }[] = [
   { v: 1024 * MB, label: "1 GB" },
   { custom: true, label: "custom..." },
 ]
+// "other folders" sits next to the default: clearing out the projects you are
+// not in is the common case, so it is one keypress away.
+const FOLDER_STEPS: { v: Folder; label: string }[] = [
+  { v: "all", label: "all folders" },
+  { v: "others", label: "other folders only" },
+  { v: "current", label: "this folder only" },
+]
 const KEEP_STEPS: { v?: number; custom?: boolean; label: string }[] = [
   { v: 0, label: "off (0)" },
   { v: 1, label: "1" },
@@ -57,6 +66,12 @@ const KEEP_STEPS: { v?: number; custom?: boolean; label: string }[] = [
   { v: 100, label: "100" },
   { custom: true, label: "custom..." },
 ]
+
+const folderLabel = (v: Folder) => FOLDER_STEPS.find((s) => s.v === v)?.label ?? String(v)
+
+// Last path segment, for either separator — the panel shows the folder name,
+// not the whole path.
+const baseName = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p
 
 function ageLabel(v: Age) {
   const step = AGE_STEPS.find((s) => s.v === v)
@@ -110,19 +125,32 @@ const tui: TuiPlugin = async (api) => {
           largerThanBytes: (opts.largerThanMB > 0 ? opts.largerThanMB * MB : null) as Bytes,
           keepPerFolder: opts.keepPerFolder,
           protectShared: opts.protectShared,
+          folder: opts.folder as Folder,
         }
 
         const match = () => applyRules(plan.sessions, rules)
 
-        type V = { kind: "rule"; rule: "age" | "size" | "keep" | "shared" } | { kind: "action"; action: "prune" | "vacuum" }
+        type Rule = "folder" | "age" | "size" | "keep" | "shared"
+        type V = { kind: "rule"; rule: Rule } | { kind: "action"; action: "prune" | "vacuum" }
 
         const pad = (label: string, value: string) => `${label.padEnd(18)}${value}`
 
+        // Why nothing matches, when something nearly does.
+        const keepHint = (heldByKeep: number) =>
+          `${heldByKeep} session(s) match the rules but are protected by "Keep per folder = ${rules.keepPerFolder}" — set that rule to off to include them.`
+
         const buildOptions = () => {
-          const { matches, estReclaim } = match()
+          const { matches, estReclaim, heldByKeep } = match()
           const sizeLabel = rules.largerThanBytes === null ? "off" : fmtBytes(rules.largerThanBytes)
           const keepLabel = rules.keepPerFolder > 0 ? String(rules.keepPerFolder) : "off (0)"
+          const folderCount = plan.sessions.filter((s) => s.here).length
           return [
+            {
+              title: pad("Folder", folderLabel(rules.folder)),
+              value: { kind: "rule", rule: "folder" } as V,
+              description: `Which folders are in scope — "${baseName(plan.currentFolder)}" is this one (${folderCount} of ${plan.totalSessions} sessions). Narrows what the rules below may delete; it never selects on its own.`,
+              category: "Rules",
+            },
             {
               title: pad("Older than", ageLabel(rules.olderThan)),
               value: { kind: "rule", rule: "age" } as V,
@@ -153,7 +181,10 @@ const tui: TuiPlugin = async (api) => {
                   ? `Clear & prune  -  ${matches.length} session(s)  (~${fmtBytes(estReclaim)})  +  VACUUM`
                   : "Clear & prune  -  no sessions match",
               value: { kind: "action", action: "prune" } as V,
-              description: "Permanently delete the matching sessions, then reclaim space",
+              description:
+                matches.length === 0 && heldByKeep > 0
+                  ? keepHint(heldByKeep)
+                  : "Permanently delete the matching sessions, then reclaim space",
               category: "Run",
             },
             {
@@ -182,7 +213,10 @@ const tui: TuiPlugin = async (api) => {
                 if (v.action === "vacuum") return confirmVacuumOnly()
                 const m = match()
                 if (m.matches.length === 0) {
-                  api.ui.toast?.({ variant: "warning", message: "No sessions match the current rules." })
+                  api.ui.toast?.({
+                    variant: "warning",
+                    message: m.heldByKeep > 0 ? keepHint(m.heldByKeep) : "No sessions match the current rules.",
+                  })
                   return openPanel({ kind: "action", action: "prune" })
                 }
                 confirmPrune(m.matches, m.estReclaim)
@@ -192,7 +226,16 @@ const tui: TuiPlugin = async (api) => {
           stack.setSize?.("xlarge")
         }
 
-        const cycle = <T extends { custom?: boolean }>(steps: T[], matchIdx: number, set: (s: T) => void, onCustom: () => void) => {
+        // `label` is required in the constraint on purpose: a constraint whose
+        // every property is optional is a "weak type", and TS rejects an
+        // argument that has no property in common with it - which is every one
+        // of the STEPS arrays below.
+        const cycle = <T extends { custom?: boolean; label: string }>(
+          steps: T[],
+          matchIdx: number,
+          set: (s: T) => void,
+          onCustom: () => void,
+        ) => {
           const next = steps[(matchIdx + 1) % steps.length]
           if (next.custom) onCustom()
           else set(next)
@@ -215,8 +258,13 @@ const tui: TuiPlugin = async (api) => {
           stack.setSize?.("medium")
         }
 
-        const editRule = (rule: "age" | "size" | "keep" | "shared") => {
+        const editRule = (rule: Rule) => {
           const here: V = { kind: "rule", rule }
+          if (rule === "folder") {
+            const i = FOLDER_STEPS.findIndex((s) => s.v === rules.folder)
+            cycle(FOLDER_STEPS, i, (s) => (rules.folder = s.v), () => {})
+            return openPanel(here)
+          }
           if (rule === "age") {
             const i = AGE_STEPS.findIndex((s) => s.v === rules.olderThan)
             cycle(AGE_STEPS, i, (s) => (rules.olderThan = s.v), () => {})
@@ -259,10 +307,16 @@ const tui: TuiPlugin = async (api) => {
         const confirmPrune = (matches: ReturnType<typeof match>["matches"], estReclaim: number) => {
           const top = matches
             .slice(0, 8)
-            .map((s) => `  ${fmtBytes(s.bytes).padStart(9)}  ${fmtAge(s.age).padStart(4)} old  ${s.title.slice(0, 44)}`)
+            .map(
+              (s) =>
+                `  ${fmtBytes(s.bytes).padStart(9)}  ${fmtAge(s.age).padStart(4)}  ${s.project.slice(0, 14).padEnd(14)}  ${s.title.slice(0, 32)}`,
+            )
           const more = matches.length - Math.min(8, matches.length)
           const message = [
             `Delete ${matches.length} session(s), freeing ~${fmtBytes(estReclaim)}, then VACUUM?`,
+            ...(rules.folder === "all"
+              ? []
+              : [`Scope: ${folderLabel(rules.folder)} — this folder is "${baseName(plan.currentFolder)}".`]),
             "",
             ...top,
             ...(more > 0 ? [`  ... and ${more} more`] : []),
